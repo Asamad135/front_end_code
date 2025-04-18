@@ -21,78 +21,71 @@ import {
 } from "@carbon/react";
 import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
-import { ErrorResponse } from "../login/page";
 import { useEffect, useState } from "react";
 
-interface LeaveData {
-  leaveType: string;
-  appliedOn: string;
-  fromDate: string;
-  toDate: string;
-  project: string;
-  reason: string;
-  approver: string;
-  status: string;
+interface LeaveHistoryResponse {
+  details: {
+    message: string;
+    data: Array<{
+      id: number;
+      leaveType: string;
+      fromDate: string;
+      toDate: string;
+      numberOfDays: number;
+      reason: string;
+      projectName: string;
+      approverName: string;
+      status: string;
+      appliedDate: string;
+      EmpId: string;
+      name: string;
+    }>;
+    statusCode: string;
+    errorCode: null;
+  };
 }
 
 const Dashboard = () => {
   const router = useRouter();
-  const rData = useSelector((s: ReduxType) => s.leaveSlice);
-  const [leaveData, setLeaveData] = useState<LeaveData[]>([])
-  const userName = useSelector(
-    (s: ReduxType) => s.userSlice.userDetails?.name
-);
-  const userInfo =useSelector(
-    (s: ReduxType) => s.userSlice.userDetails
-  );
+  const userInfo = useSelector((s: ReduxType) => s.userSlice.userDetails);
+  const userName = useSelector((s: ReduxType) => s.userSlice.userDetails?.name);
+  const [leaveData, setLeaveData] = useState<LeaveHistoryResponse["details"]["data"]>([]);
 
-  
-const LeaveDetails = async() => {
-  const baseUrl = process.env.NEXT_PUBLIC_LOGIN_URL;
-        
-        const apiUrl = `${baseUrl}/api/leave/user?EmpId=${userInfo?.EmpId}`;
-        const response = await fetch(apiUrl, {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          // body: JSON.stringify(values),
-        });
+  const fetchLeaveHistory = async () => {
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_LOGIN_URL;
+      const response = await fetch(`${baseUrl}/api/leave/user?EmpId=${userInfo?.EmpId}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
 
-        const data = await response.json();
-        const dataWithIds = data.map((item: LeaveData, index: number) => ({
-          ...item,
-          id: String(index + 1)
-        }));
-        setLeaveData(dataWithIds)
+      const data = (await response.json()) as LeaveHistoryResponse;
 
-        if (!response.ok) {
-          const errorData = data as ErrorResponse;
-          
-          throw new Error(errorData.message);
-        }
-}
-  const headers = [
-    { key: "leaveType", header: "Leave Type" },
-    { key: "appliedOn", header: "Applied On" },
-    { key: "fromDate", header: "From" },
-    { key: "toDate", header: "To" },
-    { key: "project", header: "Project" },
-    { key: "reason", header: "Reason" },
-    { key: "approver", header: "Approver" },
-    { key: "status", header: "Status" },
-  ];
+      if (!response.ok) {
+        throw new Error(data?.details?.message || "Failed to fetch leave history");
+      }
 
-  const rowData = rData?.leaveDetails?.map((item, index) => ({
-    id: String(index + 1),
-    ...item,
-  }));
+      setLeaveData(data.details.data);
+    } catch (error) {
+      console.error("Error fetching leave history:", error);
+    }
+  };
 
   useEffect(() => {
-    LeaveDetails()
-    
-  }, [])
-  
+    fetchLeaveHistory();
+  }, [userInfo?.EmpId]);
+
+  const headers = [
+    { key: "leaveType", header: "Leave Type" },
+    { key: "fromDate", header: "From Date" },
+    { key: "toDate", header: "To Date" },
+    { key: "numberOfDays", header: "Days" },
+    { key: "projectName", header: "Project" },
+    { key: "status", header: "Status" },
+    { key: "appliedDate", header: "Applied On" },
+  ];
 
   return (
     <FlexGrid

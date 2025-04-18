@@ -22,58 +22,121 @@ import { ErrorResponse } from "../login/page";
 import { useEffect, useState } from "react";
 import { ReduxType } from "@/redux/store";
 
+// First, add interfaces for the API response
+interface Project {
+  id: number;
+  name: string;
+  description: string;
+  approverName: string;
+}
+
+interface ProjectResponse {
+  details: {
+    message: string;
+    data: Project[];
+    statusCode: string;
+    errorCode: null;
+  };
+}
+
+interface LeaveApplicationResponse {
+  details: {
+    message: string;
+    data: {
+      id: number;
+      leaveType: string;
+      fromDate: string;
+      toDate: string;
+      numberOfDays: number;
+      reason: string;
+      projectName: string;
+      approverName: string;
+      status: string;
+      appliedDate: string;
+      EmpId: string;
+      name: string;
+    };
+    statusCode: string;
+    errorCode: null;
+  };
+}
+
+interface LeaveBalanceResponse {
+  details: {
+    message: string;
+    data: {
+      leaveType: string;
+      balance: number;
+      EmpId: string;
+      name: string;
+    };
+    statusCode: string;
+    errorCode: null;
+  };
+}
+
 const LeaveManagement = () => {
   const leaveTypes = ["Sick_Leave", "Casual_Leave", "Planned_Leave"];
   const approvers = ["Barnali"];
   const dispatch = useDispatch();
   const [isLoading, setIsLoading] = useState(false);
-  const [isProject, setIsProject] = useState([]);
   const [isBalance, setIsBalance] = useState([]);
+  const [projects, setProjects] = useState<string[]>([]);
   const router = useRouter();
-  const userInfo =useSelector(
-      (s: ReduxType) => s.userSlice.userDetails
-    );
-    const formik = useFormik({
-      initialValues: {
-        leaveType: "",
-        fromDate: "",
-        toDate: "",
-        project: "",
-        reason: "",
-        approver: "",
-        empId: userInfo?.EmpId,
-      },
-      validationSchema: Yup.object({
-        leaveType: Yup.string().required("Leave type is required"),
-        fromDate: Yup.string().required("From date is required"),
-        toDate: Yup.string()
-          .required("To date is required")
-          .test("is-after", "To date must be after From date", function (value) {
-            const { fromDate } = this.parent;
-            return !fromDate || !value || new Date(value) >= new Date(fromDate);
-          }),
-        project: Yup.string().required("Project is required"),
-        reason: Yup.string().required("Reason is required"),
-        approver: Yup.string().required("Approver is required"),
+  const userInfo = useSelector((s: ReduxType) => s.userSlice.userDetails);
+  const validationSchema = Yup.object({
+    leaveType: Yup.string().required("Leave type is required"),
+    fromDate: Yup.string().required("From date is required"),
+    toDate: Yup.string()
+      .required("To date is required")
+      .test("is-after", "To date must be after From date", function (value) {
+        const { fromDate } = this.parent;
+        return !fromDate || !value || new Date(value) >= new Date(fromDate);
       }),
-      onSubmit: (values) => {
-        const formatDate = (date: Date | string): string => {
-          const d = new Date(date);
-          return d.toISOString().split('T')[0]; // Output: '2025-04-01'
-        };
-      
-        const payloadWithDate = {
-          ...values,
-          fromDate: formatDate(values.fromDate),
-          toDate: formatDate(values.toDate),
-          appliedDate: formatDate(new Date()),
-          empId: userInfo?.EmpId
-        };
-        Applyleave(payloadWithDate);
-      }
-      
-    });
-    const GetProject = async() => {
+    project: Yup.string().required("Project is required"),
+    reason: Yup.string().required("Reason is required"),
+    approver: Yup.string().required("Approver is required"),
+  });
+
+  const formik = useFormik({
+    initialValues: {
+      leaveType: '',
+      fromDate: '',
+      toDate: '',
+      project: '',
+      reason: '',
+      approver: '',
+    },
+    validationSchema,
+    onSubmit: (values) => {
+      // Format dates to MM/DD/YYYY with forward slashes
+      const formatDate = (date: string) => {
+        if (!date) return '';
+        // Parse the date string (which might be in any format)
+        const d = new Date(date);
+        // Format to MM/DD/YYYY with forward slashes
+        const month = (d.getMonth() + 1).toString().padStart(2, '0');
+        const day = d.getDate().toString().padStart(2, '0');
+        const year = d.getFullYear();
+        return `${month}/${day}/${year}`;
+      };
+
+      const formattedValues = {
+        leaveType: values.leaveType.toUpperCase(),
+        fromDate: formatDate(values.fromDate),
+        toDate: formatDate(values.toDate),
+        projectName: values.project,
+        reason: values.reason,
+        approverName: values.approver
+      };
+
+      console.log('Formatted values:', formattedValues); // For debugging
+      Applyleave(formattedValues);
+    },
+  });
+
+  const GetProject = async () => {
+    try {
       const baseUrl = process.env.NEXT_PUBLIC_LOGIN_URL;
       const apiUrl = `${baseUrl}/api/employees/projects?EmpId=${userInfo?.EmpId}`;
       const response = await fetch(apiUrl, {
@@ -82,76 +145,103 @@ const LeaveManagement = () => {
           "Content-Type": "application/json",
         },
       });
-  
-      const data = await response.json();
-  
+
+      const data = (await response.json()) as ProjectResponse;
+
       if (!response.ok) {
-        const errorData = data as ErrorResponse;
-        
-        throw new Error(errorData.message);
+        throw new Error("Failed to fetch projects");
       }
-      const projectNames = data.details.data.map((project: any) => project.name);
-      setIsProject(projectNames)
-      return projectNames;
+
+      // Extract project names from the response
+      const projectNames = data.details.data.map((project) => project.name);
+      setProjects(projectNames);
+    } catch (error) {
+      console.error("Error fetching projects:", error);
     }
-    const GetBalance = async() => {
+  };
+
+  const GetBalance = async (selectedLeaveType: string) => {
+    try {
       const baseUrl = process.env.NEXT_PUBLIC_LOGIN_URL;
-      const apiUrl = `${baseUrl}/api/leave/balance?EmpId=${userInfo?.EmpId}&leaveType=SICK_LEAVE`;
+      // Keep the underscore and just convert to uppercase
+      const formattedLeaveType = selectedLeaveType.toUpperCase();
+      const apiUrl = `${baseUrl}/api/leave/balance?EmpId=${userInfo?.EmpId}&leaveType=${formattedLeaveType}`;
+      
       const response = await fetch(apiUrl, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
         },
       });
-  
-      const data = await response.json();
+
+      const data = await response.json() as LeaveBalanceResponse;
+
       if (!response.ok) {
-        const errorData = data as ErrorResponse;
-        
-        throw new Error(errorData.message);
+        throw new Error(data?.details?.message || 'Failed to fetch leave balance');
       }
-      setIsBalance(data.details.data.balance)
-      return data.details.data.balance;}
-useEffect(() => {
-  
-  GetProject()
-  GetBalance()
-}, [formik.values.leaveType])
 
-    
-  const Applyleave = async(payloadWithDate: any) => {
-    
+      setIsBalance(data.details.data.balance);
+    } catch (error) {
+      console.error("Error fetching leave balance:", error);
+      setIsBalance(0);
+    }
+  };
+
+  useEffect(() => {
+    GetProject();
+  }, [userInfo?.EmpId]);
+
+  useEffect(() => {
+    GetBalance(formik.values.leaveType);
+  }, [userInfo?.EmpId, formik.values.leaveType]);
+
+  const Applyleave = async (values: any) => {
     try {
-            setIsLoading(true);
-            const baseUrl = process.env.NEXT_PUBLIC_LOGIN_URL;
-            const apiUrl = `${baseUrl}/api/leave/apply?EmpId=${userInfo?.EmpId}`; // Update the URL to match your API endpoint
-            const response = await fetch(apiUrl, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify(payloadWithDate),
-            });
-    
-            const data = await response.json();
-    console.log(data, 'datassss');
-    
-            if (!response.ok) {
-              const errorData = data as ErrorResponse;
-              
-              throw new Error(errorData.message);
-            }
-    
-            dispatch(updateLeaveStatus(payloadWithDate));
-      router.push("/dashboard");
-          } catch (error) {
-            console.error("Error:", error);
-          } finally {
-            setIsLoading(false);
-          }
-  }
-  
+      setIsLoading(true);
+      const baseUrl = process.env.NEXT_PUBLIC_LOGIN_URL;
+      
+      if (!baseUrl || !userInfo?.EmpId) {
+        throw new Error('Missing required configuration');
+      }
 
+      const apiUrl = `${baseUrl}/api/leave/apply?EmpId=${userInfo.EmpId}`;
+      
+      const payload = {
+        leaveType: values.leaveType,
+        fromDate: values.fromDate,  // Already in MM/DD/YYYY format
+        toDate: values.toDate,      // Already in MM/DD/YYYY format
+        projectName: values.projectName,
+        reason: values.reason,
+        approverName: values.approverName
+      };
+
+      console.log('Sending payload:', payload); // For debugging
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+      console.log('API Response:', data); // For debugging
+
+      if (!response.ok) {
+        throw new Error(data?.details?.message || data?.message || 'Failed to apply leave');
+      }
+
+      alert('Leave applied successfully!');
+      dispatch(updateLeaveStatus(data.details.data));
+      router.push('/dashboard');
+    } catch (error: any) {
+      console.error('Error applying leave:', error);
+      alert(error.message || 'Failed to apply leave. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const calculateDays = (from: string, to: string) => {
     if (!from || !to) return "";
@@ -189,9 +279,12 @@ useEffect(() => {
                   titleText="Leave Type"
                   items={leaveTypes}
                   selectedItem={formik.values.leaveType}
-                  onChange={({ selectedItem }) =>
-                    formik.setFieldValue("leaveType", selectedItem)
-                  }
+                  onChange={({ selectedItem }) => {
+                    formik.setFieldValue("leaveType", selectedItem);
+                    if (selectedItem) {
+                      GetBalance(selectedItem);
+                    }
+                  }}
                   onBlur={(e) => {
                     formik.handleBlur(e);
                     if (formik.values.leaveType !== "") {
@@ -222,7 +315,7 @@ useEffect(() => {
                         <DatePickerInput
                           id="from-date"
                           labelText="From Date"
-                          placeholder="mm/dd/yyyy"
+                          placeholder="MM/DD/YYYY"  // Updated placeholder
                           onBlur={(e) => {
                             formik.handleBlur(e);
                             if (formik.values.fromDate !== "") {
@@ -254,7 +347,7 @@ useEffect(() => {
                         <DatePickerInput
                           id="to-date"
                           labelText="To Date"
-                          placeholder="mm/dd/yyyy"
+                          placeholder="MM/DD/YYYY"  // Updated placeholder
                           onBlur={(e) => {
                             formik.handleBlur(e);
                             if (formik.values.toDate !== "") {
@@ -280,7 +373,7 @@ useEffect(() => {
                       <TextInput
                         id="balance"
                         labelText="Balance"
-                        value={isBalance}
+                        value={isBalance?.toString() || '0'}
                         disabled
                       />
                     </Column>
@@ -301,7 +394,7 @@ useEffect(() => {
                 <Dropdown
                   id="project"
                   titleText="Current Project"
-                  items={isProject}
+                  items={projects} // Use the fetched projects here
                   selectedItem={formik.values.project}
                   onChange={({ selectedItem }) =>
                     formik.setFieldValue("project", selectedItem)

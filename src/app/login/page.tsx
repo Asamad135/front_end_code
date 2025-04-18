@@ -31,7 +31,6 @@ const Login = () => {
   const dispatch = useDispatch();
   const [isLoading, setIsLoading] = useState(false);
 
-  
   const validationSchema = Yup.object({
     username: Yup.string()
       .min(3, "Username must be at least 3 characters")
@@ -63,13 +62,21 @@ const Login = () => {
 
         const data = await response.json();
 
-        if (!response.ok) {
-          const errorData = data as ErrorResponse;
-          formik.setErrors({
-            username: errorData.message === "User not found" ? errorData.message : "",
-            password: errorData.message === "Invalid password" ? errorData.message : "",
-          });
-          throw new Error(errorData.message);
+        if (!response.ok || !data.details?.data) {
+          // Check for error message in the nested details object
+          const errorMessage = data?.details?.message;
+          if (errorMessage === "Invalid username or password") {
+            formik.setErrors({
+              username: "Invalid username or password",
+              password: "Invalid username or password",
+            });
+          } else {
+            formik.setErrors({
+              username: "",
+              password: "",
+            });
+          }
+          return; // Prevent further execution if login fails
         }
 
         dispatch(updateUserStatus(data.details.data));

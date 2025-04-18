@@ -1,0 +1,28 @@
+{
+  "name": "leave_management",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@carbon/react": "^1.80.0",
+    "@reduxjs/toolkit": "^2.6.1",
+    "formik": "^2.4.6",
+    "next": "15.3.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-redux": "^9.2.0",
+    "sass": "^1.86.3",
+    "yup": "^1.6.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "typescript": "^5"
+  }
+}

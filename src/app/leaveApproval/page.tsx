@@ -28,6 +28,7 @@ import { useFormik } from "formik";
 import * as Yup from "yup";
 import { useRef, useState, useEffect } from "react";
 import { useSelector } from "react-redux";
+import { ReduxType } from "@/redux/store";
 
 // Add interface for the API response
 interface TeamLeaveResponse {
@@ -55,25 +56,32 @@ interface TeamLeaveResponse {
 const LeaveApproval = () => {
   const router = useRouter();
   const userInfo = useSelector((s: ReduxType) => s.userSlice.userDetails);
-  const [leaveRequests, setLeaveRequests] = useState<TeamLeaveResponse["details"]["data"]>([]);
+  const [leaveRequests, setLeaveRequests] = useState<
+    TeamLeaveResponse["details"]["data"]
+  >([]);
   const selectedRowIdsRef = useRef<string[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMessage, setModalMessage] = useState("");
-
+  const [isAction, setIsAction] = useState<string>("");
   const fetchTeamLeaves = async () => {
     try {
       const baseUrl = process.env.NEXT_PUBLIC_LOGIN_URL;
-      const response = await fetch(`${baseUrl}/api/leave/team?approverId=EST1001`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      const response = await fetch(
+        `${baseUrl}/api/leave/team?approverId=EST1001`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
       const data = (await response.json()) as TeamLeaveResponse;
 
       if (!response.ok) {
-        throw new Error(data?.details?.message || "Failed to fetch team leaves");
+        throw new Error(
+          data?.details?.message || "Failed to fetch team leaves"
+        );
       }
 
       setLeaveRequests(data.details.data);
@@ -103,19 +111,25 @@ const LeaveApproval = () => {
 
   const handleAction = async (type: "approve" | "reject", payload: any) => {
     try {
+      console.log("isaction", isAction);
+
       const baseUrl = process.env.NEXT_PUBLIC_LOGIN_URL;
-      const response = await fetch(`${baseUrl}/api/leave/status?approverId=EST1001&status=APPROVED`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ leaveIds: payload.ids }),
-      });
+      const response = await fetch(
+        `${baseUrl}/api/leave/status?approverId=${userInfo?.EmpId}&status=${type === "approve" ? "APPROVED" : "REJECTED"}`,
+
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ leaveIds: payload.ids }),
+        }
+      );
 
       if (!response.ok) {
         throw new Error("API call failed");
       }
-      
+
       setModalMessage(
         type === "approve"
           ? "Leave(s) approved successfully!"
@@ -145,6 +159,7 @@ const LeaveApproval = () => {
       ),
     }),
     onSubmit: async (values) => {
+      setIsAction("REJECT");
       const rejected = leaveRequests
         .filter((row) => selectedRowIdsRef.current.includes(row.id.toString()))
         .map((row) => ({
@@ -155,7 +170,6 @@ const LeaveApproval = () => {
       await handleAction("reject", { ids: rejected.map((r) => r.id) });
     },
   });
-
   return (
     <FlexGrid fullWidth style={{ padding: "4rem" }}>
       <Row>
@@ -170,9 +184,9 @@ const LeaveApproval = () => {
         </Column>
       </Row>
 
-      <Row style={{ marginTop: "2rem" }}>
+      <Row style={{ marginTop: "2rem" }} className="xyz">
         <Column sm={4} md={8} lg={16}>
-          <DataTable rows={leaveRequests} headers={headers} isSortable>
+          <DataTable rows={leaveRequests}  headers={headers} isSortable>
             {({
               rows,
               headers,
@@ -193,15 +207,18 @@ const LeaveApproval = () => {
                     <TableToolbar {...getToolbarProps()}>
                       <TableBatchActions {...getBatchActionProps()}>
                         <TableBatchAction
-                          onClick={() =>
+                          onClick={() => {
+                            setIsAction("APPROVED");
                             handleAction("approve", {
                               ids: selectedRowIdsRef.current,
-                            })
-                          }
+                            });
+                          }}
                         >
                           Approve
                         </TableBatchAction>
-                        <TableBatchAction type="submit">Reject</TableBatchAction>
+                        <TableBatchAction type="submit">
+                          Reject
+                        </TableBatchAction>
                       </TableBatchActions>
                       <TableToolbarContent>
                         <TableToolbarSearch
@@ -234,10 +251,7 @@ const LeaveApproval = () => {
                               const isSelected =
                                 selectedRowIdsRef.current.includes(row.id);
 
-                              if (
-                                cell.info.header === "reason" &&
-                                isSelected
-                              ) {
+                              if (cell.info.header === "reason" && isSelected) {
                                 return (
                                   <TableCell key={cell.id}>
                                     <TextInput
@@ -284,10 +298,16 @@ const LeaveApproval = () => {
 
       <Modal
         open={isModalOpen}
-        onRequestClose={() => setIsModalOpen(false)}
+        onRequestClose={() => {
+          setIsModalOpen(false);
+          router.push("/dashboard");
+        }}
         modalHeading="Status"
         primaryButtonText="OK"
-        onRequestSubmit={() => setIsModalOpen(false)}
+        onRequestSubmit={() => {
+          setIsModalOpen(false);
+          router.push("/dashboard");
+        }}
       >
         <p>{modalMessage}</p>
       </Modal>

@@ -124,13 +124,13 @@ const Login = () => {
                 <Stack gap={5}>
                   <TextInput
                     className="input-test-class"
-                    helperText="Username"
+                    // helperText="Username"
                     id="username"
-                    labelText="Username"
+                    labelText="Employeename"
                     value={formik.values.username}
                     onChange={handleUsernameChange}
                     onBlur={formik.handleBlur}
-                    placeholder="username"
+                    placeholder="employeename"
                     size="md"
                     type="text"
                     invalid={Boolean(
@@ -141,7 +141,7 @@ const Login = () => {
 
                   <PasswordInput
                     autoComplete="true"
-                    helperText="Optional help text"
+                    // helperText="Optional help text"
                     id="password"
                     value={formik.values.password}
                     onChange={formik.handleChange}
@@ -151,7 +151,7 @@ const Login = () => {
                     )}
                     invalidText={String(formik.errors.password ?? "")}
                     labelText="Password"
-                    placeholder="Placeholder text password"
+                    placeholder="password"
                     size="md"
                   />
 

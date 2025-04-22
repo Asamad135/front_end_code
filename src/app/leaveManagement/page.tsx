@@ -52,8 +52,20 @@ interface LeaveBalanceResponse {
   };
 }
 
-const LeaveManagement = () => {
-  const leaveTypes = ["Sick_Leave", "Casual_Leave", "Planned_Leave"];
+// Mapping display name to API value
+const leaveTypeMap: Record<string, string> = {
+  "Sick Leave": "SICK_LEAVE",
+  "Casual Leave": "CASUAL_LEAVE",
+  "Privilege Leave": "PRIVILEGE_LEAVE",
+};
+
+interface LeaveManagementProps {
+  onLeaveSubmitted?: () => void;
+  onSwitchToLeaveList?: () => void;
+}
+
+const LeaveManagement = ({ onLeaveSubmitted, onSwitchToLeaveList }: LeaveManagementProps) => {
+  const leaveTypes = Object.keys(leaveTypeMap);
   const dispatch = useDispatch();
   const [isBalance, setIsBalance] = useState(0);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -63,6 +75,7 @@ const LeaveManagement = () => {
   const userInfo = useSelector((s: ReduxType) => s.userSlice.userDetails);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMessage, setModalMessage] = useState("");
+
   const calculateDays = (from: string, to: string) => {
     if (!from || !to) return "";
     const start = new Date(from);
@@ -135,7 +148,7 @@ const LeaveManagement = () => {
       };
 
       const formattedValues = {
-        leaveType: values.leaveType.toUpperCase(),
+        leaveType: leaveTypeMap[values.leaveType],
         fromDate: formatDate(values.fromDate),
         toDate: formatDate(values.toDate),
         projectName: values.project,
@@ -168,10 +181,11 @@ const LeaveManagement = () => {
 
   const GetBalance = async (selectedLeaveType: string) => {
     try {
+      const apiLeaveType = leaveTypeMap[selectedLeaveType];
       const baseUrl = process.env.NEXT_PUBLIC_LOGIN_URL;
       const apiUrl = `${baseUrl}/api/leave/balance?EmpId=${
         userInfo?.EmpId
-      }&leaveType=${selectedLeaveType.toUpperCase()}`;
+      }&leaveType=${apiLeaveType}`;
       const response = await fetch(apiUrl, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
@@ -187,7 +201,6 @@ const LeaveManagement = () => {
 
   const Applyleave = async (values: any) => {
     try {
-
       const baseUrl = process.env.NEXT_PUBLIC_LOGIN_URL;
       if (!baseUrl || !userInfo?.EmpId)
         throw new Error("Missing required configuration");
@@ -205,8 +218,9 @@ const LeaveManagement = () => {
 
       setIsModalOpen(true);
       dispatch(updateLeaveStatus(data.details.data));
-      setModalMessage("leave applied successfully");
-      router.push("/dashboard");
+      setModalMessage("Leave applied successfully");
+
+      if (onLeaveSubmitted) onLeaveSubmitted();
     } catch (error: any) {
       console.error("Error applying leave:", error);
       setIsModalOpen(true);
@@ -236,16 +250,16 @@ const LeaveManagement = () => {
   }, [formik.values.project, projects]);
 
   return (
-    <FlexGrid fullWidth style={{ padding: "4rem" }}>
-      <Row>
+    <FlexGrid fullWidth style={{ marginBottom: "3rem" }}>
+      {/* <Row>
         <Button onClick={() => router.push("/dashboard")}>Go back</Button>
-      </Row>
-      <Row>
-        <h3>Apply leave</h3>
+      </Row> */}
+      <Row style={{ marginTop: "1rem" }}>
+        <h3 style={{paddingLeft:"1rem"}}>Leave Application</h3>
       </Row>
       <Tile>
         <form onSubmit={formik.handleSubmit}>
-          <Row>
+          <Row style={{ marginTop: "2rem" }}>
             <Column sm={4} md={8} lg={16}>
               <Stack gap={6}>
                 <Dropdown
@@ -371,23 +385,26 @@ const LeaveManagement = () => {
             </Column>
           </Row>
           <Modal
-        open={isModalOpen}
-        onRequestClose={() => {
-          setIsModalOpen(false);
-          router.push("/dashboard");
-        }}
-        modalHeading="Status"
-        primaryButtonText="OK"
-        onRequestSubmit={() => {
-          setIsModalOpen(false);
-          router.push("/dashboard");
-        }}
-      >
-        <p>{modalMessage}</p>
-      </Modal>
+            open={isModalOpen}
+            onRequestClose={() => {
+              setIsModalOpen(false);
+              if (modalMessage === "Leave applied successfully" && onSwitchToLeaveList) {
+                onSwitchToLeaveList();
+              }
+            }}
+            modalHeading="Status"
+            primaryButtonText="OK"
+            onRequestSubmit={() => {
+              setIsModalOpen(false);
+              if (modalMessage === "Leave applied successfully" && onSwitchToLeaveList) {
+                onSwitchToLeaveList();
+              }
+            }}
+          >
+            <p>{modalMessage}</p>
+          </Modal>
         </form>
       </Tile>
-      
     </FlexGrid>
   );
 };

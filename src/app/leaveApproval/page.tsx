@@ -20,17 +20,13 @@ import {
   TableBatchAction,
   TableSelectAll,
   TableSelectRow,
-  TextInput,
   Modal,
 } from "@carbon/react";
 import { useRouter } from "next/navigation";
-import { useFormik } from "formik";
-import * as Yup from "yup";
 import { useRef, useState, useEffect } from "react";
 import { useSelector } from "react-redux";
 import { ReduxType } from "@/redux/store";
 
-// Add interface for the API response
 interface TeamLeaveResponse {
   details: {
     message: string;
@@ -62,12 +58,12 @@ const LeaveApproval = () => {
   const selectedRowIdsRef = useRef<string[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMessage, setModalMessage] = useState("");
-  const [isAction, setIsAction] = useState<string>("");
+
   const fetchTeamLeaves = async () => {
     try {
       const baseUrl = process.env.NEXT_PUBLIC_LOGIN_URL;
       const response = await fetch(
-        `${baseUrl}/api/leave/team?approverId=EST1001`,
+        `${baseUrl}/api/leave/team?approverId=${userInfo?.EmpId}`,
         {
           method: "GET",
           headers: {
@@ -103,20 +99,22 @@ const LeaveApproval = () => {
     { key: "appliedDate", header: "Applied On" },
     { key: "fromDate", header: "From" },
     { key: "toDate", header: "To" },
-    { key: "numberOfDays", header: "Days" },
+    { key: "numberOfDays", header: "No of Days" },
     { key: "leaveType", header: "Leave Type" },
     { key: "reason", header: "Reason" },
-    { key: "status", header: "Status" },
+    { key: "status", header: "Approver Status" },
   ];
 
-  const handleAction = async (type: "approve" | "reject", payload: any) => {
+  const handleAction = async (
+    type: "approve" | "reject",
+    payload: { ids: (number | string)[] }
+  ) => {
     try {
-      console.log("isaction", isAction);
-
       const baseUrl = process.env.NEXT_PUBLIC_LOGIN_URL;
       const response = await fetch(
-        `${baseUrl}/api/leave/status?approverId=${userInfo?.EmpId}&status=${type === "approve" ? "APPROVED" : "REJECTED"}`,
-
+        `${baseUrl}/api/leave/status?approverId=${userInfo?.EmpId}&status=${
+          type === "approve" ? "APPROVED" : "REJECTED"
+        }`,
         {
           method: "PUT",
           headers: {
@@ -129,6 +127,11 @@ const LeaveApproval = () => {
       if (!response.ok) {
         throw new Error("API call failed");
       }
+
+      // ✅ Remove updated rows from table immediately
+      setLeaveRequests((prev) =>
+        prev.filter((leave) => !payload.ids.includes(leave.id))
+      );
 
       setModalMessage(
         type === "approve"
@@ -143,50 +146,17 @@ const LeaveApproval = () => {
     }
   };
 
-  const formik = useFormik({
-    initialValues: {
-      reasons: {} as Record<string, string>,
-    },
-    validationSchema: Yup.object({
-      reasons: Yup.object().test(
-        "all-selected-have-reason",
-        "Reason is required for all rejected rows",
-        function (reasons) {
-          return selectedRowIdsRef.current.every((id) =>
-            (reasons as Record<string, string>)[id]?.trim()
-          );
-        }
-      ),
-    }),
-    onSubmit: async (values) => {
-      setIsAction("REJECT");
-      const rejected = leaveRequests
-        .filter((row) => selectedRowIdsRef.current.includes(row.id.toString()))
-        .map((row) => ({
-          ...row,
-          reason: values.reasons[row.id.toString()],
-        }));
-
-      await handleAction("reject", { ids: rejected.map((r) => r.id) });
-    },
-  });
   return (
-    <FlexGrid fullWidth style={{ padding: "4rem" }}>
+    <FlexGrid fullWidth style={{ padding: "0rem" }}>
       <Row>
-        <Column>
-          <Button onClick={() => router.push("/dashboard")}>Go back</Button>
-        </Column>
-      </Row>
-
-      <Row style={{ marginTop: "1rem" }}>
         <Column>
           <h3>Approve Leave</h3>
         </Column>
       </Row>
 
-      <Row style={{ marginTop: "2rem" }} className="xyz">
+      <Row style={{ marginTop: "2rem" }}>
         <Column sm={4} md={8} lg={16}>
-          <DataTable rows={leaveRequests}  headers={headers} isSortable>
+          <DataTable rows={leaveRequests} headers={headers} isSortable>
             {({
               rows,
               headers,
@@ -202,94 +172,64 @@ const LeaveApproval = () => {
               selectedRowIdsRef.current = selectedRows.map((r) => r.id);
 
               return (
-                <form onSubmit={formik.handleSubmit}>
-                  <TableContainer title="Leave Requests">
-                    <TableToolbar {...getToolbarProps()}>
-                      <TableBatchActions {...getBatchActionProps()}>
-                        <TableBatchAction
-                          onClick={() => {
-                            setIsAction("APPROVED");
-                            handleAction("approve", {
-                              ids: selectedRowIdsRef.current,
-                            });
-                          }}
-                        >
-                          Approve
-                        </TableBatchAction>
-                        <TableBatchAction type="submit">
-                          Reject
-                        </TableBatchAction>
-                      </TableBatchActions>
-                      <TableToolbarContent>
-                        <TableToolbarSearch
-                          placeholder="Search leave requests"
-                          onChange={(e) =>
-                            onInputChange(
-                              e as React.ChangeEvent<HTMLInputElement>
-                            )
-                          }
-                        />
-                      </TableToolbarContent>
-                    </TableToolbar>
+                <TableContainer title="Leave Requests">
+                  <TableToolbar {...getToolbarProps()}>
+                    <TableBatchActions {...getBatchActionProps()}>
+                      <TableBatchAction
+                        onClick={() =>
+                          handleAction("approve", {
+                            ids: selectedRowIdsRef.current,
+                          })
+                        }
+                      >
+                        Approve
+                      </TableBatchAction>
 
-                    <Table {...getTableProps()}>
-                      <TableHead>
-                        <TableRow>
-                          <TableSelectAll {...getSelectionProps()} />
-                          {headers.map((header) => (
-                            <TableHeader {...getHeaderProps({ header })}>
-                              {header.header}
-                            </TableHeader>
+                      <TableBatchAction
+                        onClick={() =>
+                          handleAction("reject", {
+                            ids: selectedRowIdsRef.current,
+                          })
+                        }
+                      >
+                        Reject
+                      </TableBatchAction>
+                    </TableBatchActions>
+                    <TableToolbarContent>
+                      <TableToolbarSearch
+                        placeholder="Search leave requests"
+                        onChange={(e) =>
+                          onInputChange(
+                            e as React.ChangeEvent<HTMLInputElement>
+                          )
+                        }
+                      />
+                    </TableToolbarContent>
+                  </TableToolbar>
+
+                  <Table {...getTableProps()}>
+                    <TableHead>
+                      <TableRow>
+                        <TableSelectAll {...getSelectionProps()} />
+                        {headers.map((header) => (
+                          <TableHeader {...getHeaderProps({ header })}>
+                            {header.header}
+                          </TableHeader>
+                        ))}
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {rows.map((row) => (
+                        <TableRow {...getRowProps({ row })}>
+                          <TableSelectRow {...getSelectionProps({ row })} />
+                          {row.cells.map((cell) => (
+                            <TableCell key={cell.id}>{cell.value}</TableCell>
                           ))}
                         </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {rows.map((row) => (
-                          <TableRow {...getRowProps({ row })}>
-                            <TableSelectRow {...getSelectionProps({ row })} />
-                            {row.cells.map((cell) => {
-                              const isSelected =
-                                selectedRowIdsRef.current.includes(row.id);
-
-                              if (cell.info.header === "reason" && isSelected) {
-                                return (
-                                  <TableCell key={cell.id}>
-                                    <TextInput
-                                      id={`reasons.${row.id}`}
-                                      name={`reasons.${row.id}`}
-                                      value={
-                                        formik.values.reasons[row.id] || ""
-                                      }
-                                      onChange={formik.handleChange}
-                                      labelText=""
-                                      placeholder="Enter reason"
-                                      invalid={
-                                        !!(
-                                          formik.errors.reasons &&
-                                          formik.touched.reasons &&
-                                          (formik.errors.reasons as any)[row.id]
-                                        )
-                                      }
-                                      invalidText={
-                                        (formik.errors.reasons as any)?.[row.id]
-                                      }
-                                    />
-                                  </TableCell>
-                                );
-                              }
-
-                              return (
-                                <TableCell key={cell.id}>
-                                  {cell.value}
-                                </TableCell>
-                              );
-                            })}
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                </form>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
               );
             }}
           </DataTable>

@@ -17,11 +17,14 @@ import {
   TableToolbar,
   TableToolbarContent,
   TableToolbarSearch,
-  Tile,
+  Tabs,
+  Tab,
+  TabList,
 } from "@carbon/react";
-import { useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 import { useEffect, useState } from "react";
+import LeaveManagement from "@/app/leaveManagement/page";
+import LeaveApproval from "@/app/leaveApproval/page";
 
 interface LeaveHistoryResponse {
   details: {
@@ -46,9 +49,9 @@ interface LeaveHistoryResponse {
 }
 
 const Dashboard = () => {
-  const router = useRouter();
   const userInfo = useSelector((s: ReduxType) => s.userSlice.userDetails);
-  const userName = useSelector((s: ReduxType) => s.userSlice.userDetails?.name);
+  const userName = userInfo?.name;
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const [leaveData, setLeaveData] = useState<LeaveHistoryResponse["details"]["data"]>([]);
 
   const fetchLeaveHistory = async () => {
@@ -74,25 +77,27 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
-    fetchLeaveHistory();
+    if (userInfo?.EmpId) {
+      fetchLeaveHistory();
+    }
   }, [userInfo?.EmpId]);
 
   const headers = [
     { key: "leaveType", header: "Leave Type" },
     { key: "fromDate", header: "From Date" },
     { key: "toDate", header: "To Date" },
-    { key: "numberOfDays", header: "Days" },
+    { key: "numberOfDays", header: "No of Days" },
     { key: "projectName", header: "Project" },
-    { key: "status", header: "Status" },
+    { key: "status", header: "Approver Status" },
     { key: "appliedDate", header: "Applied On" },
   ];
-
+  const leaveTypeDisplayMap: Record<string, string> = {
+    SICK_LEAVE: "Sick Leave",
+    CASUAL_LEAVE: "Casual Leave",
+    PRIVILEGE_LEAVE: "Privilege Leave",
+  };
   return (
-    <FlexGrid
-      fullWidth
-      className="Dashboard_container"
-      style={{ padding: "4rem" }}
-    >
+    <FlexGrid fullWidth className="Dashboard_container" style={{ padding: "4rem" }}>
       <Stack gap={7}>
         <Row>
           <Column lg={16}>
@@ -100,88 +105,102 @@ const Dashboard = () => {
           </Column>
         </Row>
 
-        <Row className="tile-container">
-          <Column lg={4} className="tile-wrapper">
-            <Tile onClick={() => router.push("/leaveManagement")}>
-              Leave Management
-            </Tile>
-          </Column>
-          {userInfo?.isManager && (
-            <Column
-              lg={4}
-              className="tile-wrapper"
-              style={{ marginLeft: "20px" }}
-            >
-              <Tile onClick={() => router.push("/leaveApproval")}>
-                Leave Approval
-              </Tile>
-            </Column>
-          )}
-        </Row>
-
-        <Row className="xyz">
+        <Row>
           <Column lg={16}>
-            <DataTable rows={leaveData} headers={headers} isSortable>
-              {({
-                rows,
-                headers,
-                getHeaderProps,
-                getRowProps,
-                getTableProps,
-                getToolbarProps,
-                onInputChange,
-              }) => (
-                <TableContainer title="Leave Dashboard">
-                  <TableToolbar {...getToolbarProps()}>
-                    <TableToolbarContent>
-                      <TableToolbarSearch
-                        onChange={(e) =>
-                          onInputChange(
-                            e as React.ChangeEvent<HTMLInputElement>
-                          )
-                        }
-                        placeholder="Search..."
-                      />
-                    </TableToolbarContent>
-                  </TableToolbar>
+            <Tabs
+              selectedIndex={selectedIndex}
+              onChange={(e: { selectedIndex: number }) => setSelectedIndex(e.selectedIndex)}
+            >
+              <TabList aria-label="Leave Tabs">
+                <Tab style={{ fontSize: "1rem", marginRight: "1rem" }}>Leave Management</Tab>
+                {userInfo?.isManager && <Tab style={{ fontSize: "1rem", marginRight: "1rem" }}>Leave Approval</Tab>}
+                <Tab style={{ fontSize: "1rem" }}>Leave List</Tab>
+              </TabList>
+            </Tabs>
 
-                  <Table {...getTableProps()}>
-                    <TableHead>
-                      <TableRow>
-                        {headers.map((header) => (
-                          <TableHeader
-                            key={header.key}
-                            {...getHeaderProps({ header })}
-                          >
-                            {header.header}
-                          </TableHeader>
-                        ))}
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {rows.length > 0 ? (
-                        rows.map((row) => (
-                          <TableRow key={row.id} {...getRowProps({ row })}>
-                            {row.cells.map((cell) => (
-                              <TableCell key={cell.id}>{cell.value}</TableCell>
-                            ))}
-                          </TableRow>
-                        ))
-                      ) : (
-                        <TableRow>
-                          <TableCell
-                            colSpan={headers.length}
-                            style={{ textAlign: "center" }}
-                          >
-                            No records found.
-                          </TableCell>
-                        </TableRow>
+            {/* Render component based on tab selection */}
+            {selectedIndex === 0 && (
+              <div style={{ marginTop: "1rem" }}>
+                <LeaveManagement
+                  onLeaveSubmitted={fetchLeaveHistory}
+                  onSwitchToLeaveList={() => setSelectedIndex(2)} // 👈 Switch to Leave List tab
+                />
+              </div>
+            )}
+            {selectedIndex === 1 && userInfo?.isManager && (
+              <div style={{ marginTop: "1rem" }}>
+                <LeaveApproval />
+              </div>
+            )}
+            {selectedIndex === 2 && (
+              <div style={{ marginTop: "1rem", marginBottom: "1rem" }}>
+                <Row className="xyz">
+                  <Column lg={16}>
+                    <DataTable rows={leaveData} headers={headers} isSortable>
+                      {({
+                        rows,
+                        headers,
+                        getHeaderProps,
+                        getRowProps,
+                        getTableProps,
+                        getToolbarProps,
+                        onInputChange,
+                      }) => (
+                        <TableContainer title="Leave Dashboard">
+                          <TableToolbar {...getToolbarProps()}>
+                            <TableToolbarContent>
+                              <TableToolbarSearch
+                                onChange={(e) =>
+                                  onInputChange(e as React.ChangeEvent<HTMLInputElement>)
+                                }
+                                placeholder="Search..."
+                              />
+                            </TableToolbarContent>
+                          </TableToolbar>
+
+                          <Table {...getTableProps()}>
+                            <TableHead>
+                              <TableRow>
+                                {headers.map((header) => (
+                                  <TableHeader
+                                    key={header.key}
+                                    {...getHeaderProps({ header })}
+                                  >
+                                    {header.header}
+                                  </TableHeader>
+                                ))}
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {rows.length > 0 ? (
+                                rows.map((row) => (
+                                  <TableRow key={row.id} {...getRowProps({ row })}>
+                                    {row.cells.map((cell) => (
+                                      <TableCell key={cell.id}>
+                                        {cell.info.header === "leaveType"
+                                          ? leaveTypeDisplayMap[cell.value] || cell.value
+                                          : cell.value}
+                                      </TableCell>
+                                    ))}
+
+                                  </TableRow>
+                                ))
+                              ) : (
+                                <TableRow>
+                                  <TableCell colSpan={headers.length} style={{ textAlign: "center" }}>
+                                    No records found.
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
                       )}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              )}
-            </DataTable>
+                    </DataTable>
+                  </Column>
+                </Row>
+              </div>
+            )}
           </Column>
         </Row>
       </Stack>

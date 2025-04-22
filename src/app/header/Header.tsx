@@ -31,12 +31,13 @@ const Header = () => {
       {/* Add navigation or branding if needed */}
       {/* <span style={{ color: "#fff", marginLeft: "1rem" }}>Intellisphere</span> */}
       <HeaderName
+         prefix=""
         className="app-name color"
         onClick={() => {
           router.push("/dashboard");
         }}
       >
-        Intellisphere
+        Leave Management System
       </HeaderName>
       <HeaderGlobalBar>
         <HeaderGlobalAction aria-label="Logout" title="Logout">
@@ -46,7 +47,7 @@ const Header = () => {
             onClick={() => router.push("/login")}
           />
         </HeaderGlobalAction>
-        <HeaderGlobalAction
+        {/* <HeaderGlobalAction
           aria-label="App Switcher"
           title="App Switcher"
           onClick={() => setIsSwitcherOpen((prev) => !prev)}
@@ -77,7 +78,7 @@ const Header = () => {
               )}
             </div>
           )}
-        </HeaderGlobalAction>
+        </HeaderGlobalAction> */}
       </HeaderGlobalBar>
     </CarbonHeader>
   );
